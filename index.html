@@ -387,11 +387,29 @@ function creativeCardHTML(r, thumbUrl) {
     "</div></div>";
 }
 function creativeGridHTML(rows) {
-  var top = rows.filter(function (r) { return r.conversions > 0; }).slice(0, 24);
-  if (!top.length) top = rows.slice(0, 12);
-  var cards = top.length ? top.map(function (r) {
+  // Several ads can reuse the exact same visual (image/video). Dedupe by
+  // thumbnail URL so each distinct creative appears once, with its stats
+  // summed across every ad that uses it. Ads with no thumbnail are kept
+  // as separate cards (nothing to dedupe them against).
+  var groups = {};
+  var order = [];
+  rows.forEach(function (r) {
     var thumbUrl = AD_THUMBS[r.id] || "";
-    return creativeCardHTML(r, thumbUrl);
+    var key = thumbUrl ? ("img:" + thumbUrl) : ("noimg:" + r.id);
+    if (!groups[key]) { groups[key] = { thumbUrl: thumbUrl, conversions: 0, spend: 0 }; order.push(key); }
+    groups[key].conversions += r.conversions || 0;
+    groups[key].spend += r.spend || 0;
+  });
+  var merged = order.map(function (key) {
+    var g = groups[key];
+    return { thumbUrl: g.thumbUrl, conversions: g.conversions, spend: g.spend, cpa: g.conversions ? g.spend / g.conversions : null };
+  });
+  merged.sort(function (a, b) { return b.conversions - a.conversions; });
+
+  var top = merged.filter(function (r) { return r.conversions > 0; }).slice(0, 24);
+  if (!top.length) top = merged.slice(0, 12);
+  var cards = top.length ? top.map(function (r) {
+    return creativeCardHTML(r, r.thumbUrl);
   }).join("") : "<p class='empty-note'>Rien à afficher sur cette période.</p>";
   return "<div class='section'><div class='section-head'><h3>Messages par créative</h3></div><div class='card'><div class='creative-grid'>" + cards + "</div></div></div>";
 }
@@ -564,7 +582,6 @@ function render() {
   var creativeBlockHTML = creativeGridHTML(adCmp);
 
   var campaignCmp = aggregateGroup(DATA.daily_campaign, since, until, "campaign_id", "campaign_name", primaryType, "spend");
-  var adsetCmp = aggregateGroup(DATA.daily_adset, since, until, "adset_id", "adset_name", primaryType, "spend");
 
   var html =
     '<div class="kpi-grid">' + kpiHTML + '</div>' +
@@ -577,7 +594,6 @@ function render() {
     creativeBlockHTML +
     '<div class="section"><div class="section-head"><h3>Détail des conversions</h3></div><div class="card table-scroll">' + convTableHTML + '</div></div>' +
     cmpTableBlock("Performance par campagne", campaignCmp) +
-    cmpTableBlock("Performance par ensemble de publicités", adsetCmp) +
     '<p class="footnote">Rapport de performance préparé par ' + esc(DATA.meta.agency_name || "Kaylest Agency") + '. Événement de conversion principal suivi : ' + esc(primaryLabel) + '. Données mises à jour automatiquement plusieurs fois par jour ; dernière synchronisation : ' + esc(formatSyncTime(DATA.meta.last_updated)) + '.</p>';
 
   document.getElementById("app").innerHTML = html;
