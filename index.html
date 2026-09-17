@@ -3,51 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Belkatours — Rapport Meta Ads</title>
+<title>Reflecto 2 — Rapport Meta Ads</title>
 <style>
   :root{
     color-scheme: light;
-    --surface-1: #fcfcfb; --page-plane: #f9f9f7; --text-primary: #0b0b0b;
-    --text-secondary: #52514e; --text-muted: #898781; --border: rgba(11,11,11,0.10);
-    --series-spend: #2a78d6;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-spend:   #2a78d6;
+    --series-conv:    #1baf7a;
+    --good:           #0ca30c;
+    --critical:       #d03b3b;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       color-scheme: dark;
       --surface-1: #1a1a19; --page-plane: #0d0d0d; --text-primary: #ffffff;
-      --text-secondary: #c3c2b7; --text-muted: #898781; --border: rgba(255,255,255,0.10);
-      --series-spend: #3987e5;
+      --text-secondary: #c3c2b7; --text-muted: #898781; --gridline: #2c2c2a;
+      --baseline: #383835; --border: rgba(255,255,255,0.10);
+      --series-spend: #3987e5; --series-conv: #199e70;
     }
   }
   :root[data-theme="dark"]{
     color-scheme: dark;
     --surface-1: #1a1a19; --page-plane: #0d0d0d; --text-primary: #ffffff;
-    --text-secondary: #c3c2b7; --text-muted: #898781; --border: rgba(255,255,255,0.10);
-    --series-spend: #3987e5;
+    --text-secondary: #c3c2b7; --text-muted: #898781; --gridline: #2c2c2a;
+    --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --series-spend: #3987e5; --series-conv: #199e70;
   }
-  *{ box-sizing:border-box; }
-  html,body{ margin:0; padding:0; height:100%; }
-  body{
-    background:var(--page-plane); color:var(--text-primary);
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px;
-  }
-  .card{
-    background:var(--surface-1); border:1px solid var(--border); border-radius:16px;
-    padding:40px 32px; max-width:440px; text-align:center;
-  }
-  .eyebrow{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); font-weight:600; }
-  h1{ font-size:22px; margin:8px 0 12px; letter-spacing:-.01em; }
-  p{ font-size:14px; color:var(--text-secondary); line-height:1.6; margin:0; }
-  .dot{ width:8px; height:8px; border-radius:50%; background:var(--series-spend); display:inline-block; margin-bottom:16px; }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background: var(--page-plane); color: var(--text-primary); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; padding: 20px 16px 60px; }
+  .wrap{ max-width: 1180px; margin: 0 auto; }
+  header.top{ margin-bottom:20px; }
+  .brand .eyebrow{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); font-weight:600; }
+  .brand h1{ margin:4px 0 2px; font-size:22px; font-weight:700; letter-spacing:-.01em; }
+  .brand .acct{ font-size:13px; color:var(--text-secondary); }
+  .kpi-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:2px; background: var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:22px; }
+  @media (min-width:560px){ .kpi-grid{ grid-template-columns:repeat(4,1fr); } }
+  @media (min-width:900px){ .kpi-grid{ grid-template-columns:repeat(8,1fr); } }
+  .kpi{ background: var(--surface-1); padding:16px 16px 14px; display:flex; flex-direction:column; gap:6px; min-height:88px; }
+  .kpi .label{ font-size:11.5px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .kpi .value{ font-size:22px; font-weight:700; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+  .section{ margin-bottom:26px; }
+  .section-head{ margin-bottom:10px; }
+  .section-head h3{ margin:0; font-size:14px; font-weight:700; }
+  .card{ background:var(--surface-1); border:1px solid var(--border); border-radius:14px; padding:18px; }
+  .charts-row{ display:grid; grid-template-columns:1fr; gap:14px; }
+  @media (min-width:760px){ .charts-row{ grid-template-columns:1.3fr 1fr; } }
+  .chart-box{ position:relative; height:220px; }
+  .chart-box svg{ display:block; width:100%; height:100%; overflow:visible; }
+  .chart-title{ font-size:12px; font-weight:600; color:var(--text-secondary); margin-bottom:10px; }
+  .table-scroll{ overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; min-width:520px; }
+  thead th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--gridline); white-space:nowrap; }
+  thead th.num, td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  tbody td{ padding:9px 10px; border-bottom:1px solid var(--gridline); white-space:nowrap; }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.name{ max-width:220px; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  .empty-note{ font-size:12.5px; color:var(--text-muted); padding:20px 4px; text-align:center; }
+  .footnote{ font-size:11.5px; color:var(--text-muted); text-align:center; margin-top:30px; line-height:1.6; }
 </style>
 </head>
 <body>
-  <div class="card">
-    <span class="dot"></span>
-    <div class="eyebrow">Belkatours</div>
-    <h1>Rapport de performance en préparation</h1>
-    <p>Ce lien affichera bientôt le rapport de performance Meta Ads de Belkatours, préparé par Kaylest Agency. Revenez sous peu.</p>
-  </div>
+<div class="wrap">
+<header class="top"><div class="brand"><span class="eyebrow">Rapport Meta Ads</span><h1>Reflecto 2</h1><span class="acct">Période : 30 derniers jours · Généré le 17 septembre 2026 à 11:23 UTC</span></div></header>
+<div class="kpi-grid"><div class="kpi"><span class="label">Dépense</span><span class="value">0,00 $US</span></div><div class="kpi"><span class="label">CPA (conversions)</span><span class="value">—</span></div><div class="kpi"><span class="label">ROAS</span><span class="value">—</span></div><div class="kpi"><span class="label">Impressions</span><span class="value">0</span></div><div class="kpi"><span class="label">Reach</span><span class="value">0</span></div><div class="kpi"><span class="label">CTR</span><span class="value">0 %</span></div><div class="kpi"><span class="label">CPM</span><span class="value">0,00 $US</span></div><div class="kpi"><span class="label">Clics</span><span class="value">0</span></div></div>
+<div class="section"><div class="section-head"><h3>Évolution sur la période</h3></div><div class="card"><div class="charts-row"><div><div class="chart-title">Dépense quotidienne</div><div class="chart-box"><p class='empty-note'>Pas de données.</p></div></div><div><div class="chart-title">Conversions quotidiennes (conversions)</div><div class="chart-box"><p class='empty-note'>Pas de données.</p></div></div></div></div></div>
+<div class="section"><div class="section-head"><h3>Détail des conversions</h3></div><div class="card table-scroll"><table><thead><tr><th>Type de conversion</th><th class='num'>Nombre</th><th class='num'>Coût / conversion</th><th class='num'>Valeur générée</th></tr></thead><tbody></tbody></table><p class='empty-note'>Aucune conversion enregistrée sur cette période.</p></div></div>
+<div class='section'><div class='section-head'><h3>Performance par campagne</h3></div><div class='card table-scroll'><table><thead><tr><th>Nom</th><th class='num'>Dépense</th><th class='num'>Impressions</th><th class='num'>Reach</th><th class='num'>CTR</th><th class='num'>CPM</th><th class='num'>Conversions</th><th class='num'>CPA</th><th class='num'>ROAS</th></tr></thead><tbody><tr><td colspan='9' style='text-align:center;color:var(--text-muted);padding:18px;'>Rien à afficher.</td></tr></tbody></table></div></div>
+<div class='section'><div class='section-head'><h3>Performance par ensemble de publicités</h3></div><div class='card table-scroll'><table><thead><tr><th>Nom</th><th class='num'>Dépense</th><th class='num'>Impressions</th><th class='num'>Reach</th><th class='num'>CTR</th><th class='num'>CPM</th><th class='num'>Conversions</th><th class='num'>CPA</th><th class='num'>ROAS</th></tr></thead><tbody><tr><td colspan='9' style='text-align:center;color:var(--text-muted);padding:18px;'>Rien à afficher.</td></tr></tbody></table></div></div>
+<p class="footnote">Rapport de performance préparé par Kaylest Agency. Événement de conversion principal suivi : conversions. Mis à jour automatiquement plusieurs fois par jour.</p>
+</div>
 </body>
 </html>
