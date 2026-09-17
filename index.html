@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Rapport Meta Ads</title>
+<title>Belkatours Agency — Rapport Meta Ads</title>
 <style>
   :root{
     color-scheme: light;
@@ -75,6 +75,8 @@
   .footnote{ font-size:11.5px; color:var(--text-muted); text-align:center; margin-top:30px; line-height:1.6; }
   .loading, .error-box{ text-align:center; padding:80px 20px; color:var(--text-muted); font-size:14px; }
   .error-box{ color:var(--critical); }
+  .age-bar-track{ width:100%; min-width:80px; height:8px; background:var(--gridline); border-radius:999px; overflow:hidden; }
+  .age-bar-fill{ height:100%; background:var(--series-conv); border-radius:999px; }
 </style>
 </head>
 <body>
@@ -95,6 +97,7 @@
 // below if the Apps Script Web App is ever redeployed.
 // =================================================================
 var WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxm7GZDy6zf7gRaeVKYwGDv9dTDYdu9Obsnu3083o0qttF8VT6eFWriq3nYpgYI7x2E/exec";
+var CLIENT_DISPLAY_NAME = "Belkatours Agency";
 
 var DATA = null;      // raw payload from the Web App
 var CURRENCY = "USD";
@@ -122,14 +125,25 @@ var ACTION_LABELS = {
   landing_page_view: "Vues de page de destination",
   view_content: "Vues de contenu",
   add_payment_info: "Infos de paiement ajoutées",
-  onsite_conversion_total_messaging_connection: "Conversations démarrées",
-  "onsite_conversion.total_messaging_connection": "Conversations démarrées",
-  "onsite_conversion.messaging_conversation_started_7d": "Conversations démarrées (7j)",
-  messaging_conversation_started_7d: "Conversations démarrées",
+  onsite_conversion_total_messaging_connection: "Messages",
+  "onsite_conversion.total_messaging_connection": "Messages",
+  "onsite_conversion.messaging_conversation_started_7d": "Messages (7j)",
+  messaging_conversation_started_7d: "Messages",
+  "onsite_conversion.messaging_first_reply": "Premières réponses",
+  "onsite_conversion.messaging_user_depth_2_message_send": "Messages (profondeur 2)",
+  "onsite_conversion.messaging_user_depth_3_message_send": "Messages (profondeur 3)",
+  "onsite_conversion.post_save": "Publications enregistrées",
+  "onsite_conversion.post_net_save": "Publications enregistrées (net)",
+  "onsite_conversion.post_net_comment": "Commentaires (net)",
+  "onsite_conversion.post_net_like": "J'aime (net)",
+  post_interaction_gross: "Interactions publication (brutes)",
+  post_interaction_net: "Interactions publication (nettes)",
   post_engagement: "Interactions avec la publication",
   page_engagement: "Interactions avec la page",
+  post_reaction: "Réactions",
   like: "J'aime",
   comment: "Commentaires",
+  post: "Publications",
   video_view: "Vues vidéo"
 };
 function actionLabel(type) { return ACTION_LABELS[type] || type.replace(/_/g, " ").replace(/\./g, " "); }
@@ -143,9 +157,16 @@ function mapToActionsArray(m) {
   return Object.keys(m).map(function (k) { return { action_type: k, value: m[k] }; });
 }
 
-var PRIORITY = ["purchase", "omni_purchase", "lead", "offsite_conversion_fb_pixel_lead", "complete_registration",
-  "add_to_cart", "initiate_checkout", "onsite_conversion.total_messaging_connection",
-  "onsite_conversion.messaging_conversation_started_7d", "link_click"];
+// Messaging objective first: this account's campaigns are optimized for
+// Messenger/WhatsApp/IG conversations, so those action types always win
+// the "primary" metric slot ahead of purchase/lead types.
+var PRIORITY = [
+  "onsite_conversion.total_messaging_connection",
+  "onsite_conversion.messaging_conversation_started_7d",
+  "messaging_conversation_started_7d",
+  "onsite_conversion.messaging_first_reply",
+  "purchase", "omni_purchase", "lead", "offsite_conversion_fb_pixel_lead", "complete_registration",
+  "add_to_cart", "initiate_checkout", "link_click"];
 function pickPrimaryActionType(actionsMap) {
   for (var i = 0; i < PRIORITY.length; i++) if (actionsMap[PRIORITY[i]]) return PRIORITY[i];
   var keys = Object.keys(actionsMap);
@@ -229,17 +250,14 @@ function kpiGridHTML(account, primaryType, primaryLabel) {
   var spend = account.spend || 0;
   var primaryCount = primaryType ? (actions[primaryType] || 0) : 0;
   var cpa = primaryCount ? spend / primaryCount : null;
-
-  var roas = null;
-  var values = actionsToMap(account.action_values || []);
-  if (values.purchase || values.omni_purchase) roas = (values.purchase || values.omni_purchase) / (spend || 1);
+  var costLabel = /messag/i.test(primaryLabel) ? "Coût par message" : ("Coût / " + primaryLabel.toLowerCase());
 
   var tiles = [
     { label: "Dépense", value: money(spend) },
-    { label: "CPA (" + primaryLabel.toLowerCase() + ")", value: cpa != null ? money(cpa) : "—" },
-    { label: "ROAS", value: roas != null ? (num(roas) + "x") : "—" },
+    { label: primaryLabel, value: num(primaryCount) },
+    { label: costLabel, value: cpa != null ? money(cpa) : "—" },
+    { label: "Couverture", value: num(account.reach) },
     { label: "Impressions", value: num(account.impressions) },
-    { label: "Reach (approx.)", value: num(account.reach) },
     { label: "CTR", value: pct(account.ctr) },
     { label: "CPM", value: money(account.cpm) },
     { label: "Clics", value: num(account.clicks) }
@@ -284,13 +302,40 @@ function cmpRowHTML(r) {
     "<td class='num'>" + money(r.cpm) + "</td>" +
     "<td class='num'>" + num(r.conversions) + "</td>" +
     "<td class='num'>" + (r.cpa != null ? money(r.cpa) : "—") + "</td>" +
-    "<td class='num'>" + (r.roas != null ? (num(r.roas) + "x") : "—") + "</td>" +
     "</tr>";
 }
 function cmpTableBlock(title, rows) {
-  var head = "<thead><tr><th>Nom</th><th class='num'>Dépense</th><th class='num'>Impressions</th><th class='num'>Reach</th><th class='num'>CTR</th><th class='num'>CPM</th><th class='num'>Conversions</th><th class='num'>CPA</th><th class='num'>ROAS</th></tr></thead>";
-  var body = rows.length ? rows.map(cmpRowHTML).join("") : "<tr><td colspan='9' style='text-align:center;color:var(--text-muted);padding:18px;'>Rien à afficher sur cette période.</td></tr>";
+  var head = "<thead><tr><th>Nom</th><th class='num'>Dépense</th><th class='num'>Impressions</th><th class='num'>Reach</th><th class='num'>CTR</th><th class='num'>CPM</th><th class='num'>Messages</th><th class='num'>Coût / message</th></tr></thead>";
+  var body = rows.length ? rows.map(cmpRowHTML).join("") : "<tr><td colspan='8' style='text-align:center;color:var(--text-muted);padding:18px;'>Rien à afficher sur cette période.</td></tr>";
   return "<div class='section'><div class='section-head'><h3>" + esc(title) + "</h3></div><div class='card table-scroll'><table>" + head + "<tbody>" + body + "</tbody></table></div></div>";
+}
+
+// ---------------------------------------------------------------
+// Age breakdown table
+// ---------------------------------------------------------------
+var AGE_ORDER = ["13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"];
+function ageSortKey(age) {
+  var idx = AGE_ORDER.indexOf(age);
+  return idx === -1 ? 999 : idx;
+}
+function ageTableBlock(rows) {
+  var maxMsg = Math.max.apply(null, rows.map(function (r) { return r.messages; }).concat([0])) || 1;
+  var totalMsg = rows.reduce(function (s, r) { return s + r.messages; }, 0);
+  var body = rows.length ? rows.map(function (r) {
+    var pctShare = totalMsg ? (r.messages / totalMsg) * 100 : 0;
+    var barWidth = maxMsg ? Math.round((r.messages / maxMsg) * 100) : 0;
+    return "<tr>" +
+      "<td class='name'>" + esc(r.age) + "</td>" +
+      "<td class='num'>" + num(r.messages) + "</td>" +
+      "<td class='num'>" + num(pctShare) + " %</td>" +
+      "<td><div class='age-bar-track'><div class='age-bar-fill' style='width:" + barWidth + "%'></div></div></td>" +
+      "<td class='num'>" + money(r.spend) + "</td>" +
+      "<td class='num'>" + (r.costPerMsg != null ? money(r.costPerMsg) : "—") + "</td>" +
+      "<td class='num'>" + num(r.impressions) + "</td>" +
+      "</tr>";
+  }).join("") : "<tr><td colspan='7' style='text-align:center;color:var(--text-muted);padding:18px;'>Rien à afficher sur cette période.</td></tr>";
+  var head = "<thead><tr><th>Tranche d'âge</th><th class='num'>Messages</th><th class='num'>% du total</th><th>Répartition</th><th class='num'>Dépense</th><th class='num'>Coût / message</th><th class='num'>Impressions</th></tr></thead>";
+  return "<div class='section'><div class='section-head'><h3>Messages par tranche d'âge</h3></div><div class='card table-scroll'><table>" + head + "<tbody>" + body + "</tbody></table></div></div>";
 }
 
 // ---------------------------------------------------------------
@@ -348,7 +393,7 @@ function aggregateAccount(since, until) {
   };
 }
 
-function aggregateGroup(rows, since, until, idField, nameField, primaryType) {
+function aggregateGroup(rows, since, until, idField, nameField, primaryType, sortBy) {
   var filtered = rows.filter(function (r) { return inRange(r.date, since, until); });
   var groups = {};
   filtered.forEach(function (r) {
@@ -358,7 +403,7 @@ function aggregateGroup(rows, since, until, idField, nameField, primaryType) {
     g.spend += r.spend || 0; g.impressions += r.impressions || 0; g.reach += r.reach || 0; g.clicks += r.clicks || 0;
     (r.actions || []).forEach(function (a) { g.actionsMap[a.action_type] = (g.actionsMap[a.action_type] || 0) + (parseFloat(a.value) || 0); });
   });
-  return Object.keys(groups).map(function (id) {
+  var out = Object.keys(groups).map(function (id) {
     var g = groups[id];
     var conversions = primaryType ? (g.actionsMap[primaryType] || 0) : 0;
     return {
@@ -366,10 +411,38 @@ function aggregateGroup(rows, since, until, idField, nameField, primaryType) {
       ctr: g.impressions ? (g.clicks / g.impressions) * 100 : 0,
       cpm: g.impressions ? (g.spend / g.impressions) * 1000 : 0,
       conversions: conversions,
-      cpa: conversions ? g.spend / conversions : null,
-      roas: null
+      cpa: conversions ? g.spend / conversions : null
     };
-  }).sort(function (a, b) { return b.spend - a.spend; });
+  });
+  if (sortBy === "conversions") {
+    out.sort(function (a, b) { return b.conversions - a.conversions; });
+  } else {
+    out.sort(function (a, b) { return b.spend - a.spend; });
+  }
+  return out;
+}
+
+function aggregateAge(since, until, primaryType) {
+  var rows = (DATA.daily_age || []).filter(function (r) { return inRange(r.date, since, until); });
+  var groups = {};
+  rows.forEach(function (r) {
+    var age = r.age || "unknown";
+    if (!groups[age]) groups[age] = { age: age, spend: 0, impressions: 0, clicks: 0, actionsMap: {} };
+    var g = groups[age];
+    g.spend += r.spend || 0; g.impressions += r.impressions || 0; g.clicks += r.clicks || 0;
+    (r.actions || []).forEach(function (a) { g.actionsMap[a.action_type] = (g.actionsMap[a.action_type] || 0) + (parseFloat(a.value) || 0); });
+  });
+  var out = Object.keys(groups).map(function (age) {
+    var g = groups[age];
+    var messages = primaryType ? (g.actionsMap[primaryType] || 0) : 0;
+    return {
+      age: age, spend: g.spend, impressions: g.impressions, clicks: g.clicks,
+      messages: messages,
+      costPerMsg: messages ? g.spend / messages : null
+    };
+  });
+  out.sort(function (a, b) { return ageSortKey(a.age) - ageSortKey(b.age); });
+  return out;
 }
 
 function dailySeries(since, until, primaryType) {
@@ -388,7 +461,7 @@ function render() {
   var accountRow = aggregateAccount(since, until);
   var actionsMap = actionsToMap(accountRow.actions);
   var primaryType = pickPrimaryActionType(actionsMap);
-  var primaryLabel = primaryType ? actionLabel(primaryType) : "conversions";
+  var primaryLabel = primaryType ? actionLabel(primaryType) : "Messages";
 
   var series = dailySeries(since, until, primaryType);
   var spendChart = series.dates.length ? lineChartSVG(series.dates, series.spendVals, COLOR_SPEND, function (v) { return money(v); }) : "<p class='empty-note'>Pas de données sur cette période.</p>";
@@ -399,15 +472,23 @@ function render() {
   var convTableHTML = "<table><thead><tr><th>Type de conversion</th><th class='num'>Nombre</th><th class='num'>Coût / conversion</th><th class='num'>Valeur générée</th></tr></thead><tbody>" + conv.tbody + "</tbody></table>" +
     (conv.empty ? "<p class='empty-note'>Aucune conversion enregistrée sur cette période.</p>" : "");
 
-  var campaignCmp = aggregateGroup(DATA.daily_campaign, since, until, "campaign_id", "campaign_name", primaryType);
-  var adsetCmp = aggregateGroup(DATA.daily_adset, since, until, "adset_id", "adset_name", primaryType);
+  var ageRows = aggregateAge(since, until, primaryType);
+  var ageBlockHTML = ageTableBlock(ageRows);
+
+  var adCmp = aggregateGroup(DATA.daily_ad || [], since, until, "ad_id", "ad_name", primaryType, "conversions");
+  var adMessagesBlockHTML = cmpTableBlock("Quelle publicité génère le plus de messages", adCmp);
+
+  var campaignCmp = aggregateGroup(DATA.daily_campaign, since, until, "campaign_id", "campaign_name", primaryType, "spend");
+  var adsetCmp = aggregateGroup(DATA.daily_adset, since, until, "adset_id", "adset_name", primaryType, "spend");
 
   var html =
     '<div class="kpi-grid">' + kpiHTML + '</div>' +
     '<div class="section"><div class="section-head"><h3>Évolution sur la période</h3></div><div class="card"><div class="charts-row">' +
     '<div><div class="chart-title">Dépense quotidienne</div><div class="chart-box">' + spendChart + '</div></div>' +
-    '<div><div class="chart-title">Conversions quotidiennes (' + esc(primaryLabel.toLowerCase()) + ')</div><div class="chart-box">' + convChart + '</div></div>' +
+    '<div><div class="chart-title">Messages quotidiens</div><div class="chart-box">' + convChart + '</div></div>' +
     '</div></div></div>' +
+    ageBlockHTML +
+    adMessagesBlockHTML +
     '<div class="section"><div class="section-head"><h3>Détail des conversions</h3></div><div class="card table-scroll">' + convTableHTML + '</div></div>' +
     cmpTableBlock("Performance par campagne", campaignCmp) +
     cmpTableBlock("Performance par ensemble de publicités", adsetCmp) +
@@ -501,7 +582,7 @@ fetch(WEBAPP_URL)
   .then(function (json) {
     DATA = json;
     CURRENCY = json.meta.currency || "USD";
-    document.getElementById("acctName").textContent = json.meta.account_name || "Compte Meta Ads";
+    document.getElementById("acctName").textContent = json.meta.display_name || CLIENT_DISPLAY_NAME;
 
     renderRangeBar();
     setActivePreset("last30d");
