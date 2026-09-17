@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Belkatours — Rapport Meta Ads</title>
+<style>
+  :root{
+    color-scheme: light;
+    --surface-1: #fcfcfb; --page-plane: #f9f9f7; --text-primary: #0b0b0b;
+    --text-secondary: #52514e; --text-muted: #898781; --border: rgba(11,11,11,0.10);
+    --series-spend: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --surface-1: #1a1a19; --page-plane: #0d0d0d; --text-primary: #ffffff;
+      --text-secondary: #c3c2b7; --text-muted: #898781; --border: rgba(255,255,255,0.10);
+      --series-spend: #3987e5;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --surface-1: #1a1a19; --page-plane: #0d0d0d; --text-primary: #ffffff;
+    --text-secondary: #c3c2b7; --text-muted: #898781; --border: rgba(255,255,255,0.10);
+    --series-spend: #3987e5;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; height:100%; }
+  body{
+    background:var(--page-plane); color:var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px;
+  }
+  .card{
+    background:var(--surface-1); border:1px solid var(--border); border-radius:16px;
+    padding:40px 32px; max-width:440px; text-align:center;
+  }
+  .eyebrow{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); font-weight:600; }
+  h1{ font-size:22px; margin:8px 0 12px; letter-spacing:-.01em; }
+  p{ font-size:14px; color:var(--text-secondary); line-height:1.6; margin:0; }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--series-spend); display:inline-block; margin-bottom:16px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <span class="dot"></span>
+    <div class="eyebrow">Belkatours</div>
+    <h1>Rapport de performance en préparation</h1>
+    <p>Ce lien affichera bientôt le rapport de performance Meta Ads de Belkatours, préparé par Kaylest Agency. Revenez sous peu.</p>
+  </div>
+</body>
+</html>
