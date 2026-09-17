@@ -77,6 +77,14 @@
   .error-box{ color:var(--critical); }
   .age-bar-track{ width:100%; min-width:80px; height:8px; background:var(--gridline); border-radius:999px; overflow:hidden; }
   .age-bar-fill{ height:100%; background:var(--series-conv); border-radius:999px; }
+  .creative-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
+  .creative-card{ border:1px solid var(--gridline); border-radius:10px; overflow:hidden; background:var(--card-bg, #fff); display:flex; flex-direction:column; }
+  .creative-thumb{ width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--gridline); }
+  .creative-placeholder{ width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; background:var(--gridline); color:var(--text-muted); font-size:11.5px; text-align:center; padding:8px; }
+  .creative-stats{ padding:8px 10px 10px; display:flex; flex-direction:column; gap:3px; }
+  .creative-stat{ display:flex; justify-content:space-between; align-items:baseline; font-size:11.5px; }
+  .creative-stat .label{ color:var(--text-muted); }
+  .creative-stat .value{ font-weight:700; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
@@ -102,6 +110,7 @@ var CLIENT_DISPLAY_NAME = "Belkatours Agency";
 var DATA = null;      // raw payload from the Web App
 var CURRENCY = "USD";
 var currentRange = null; // {since, until, label}
+var AD_THUMBS = {};   // ad_id -> thumbnail_url, built once DATA loads
 
 // ---------------------------------------------------------------
 // Formatting helpers (mirrors the original static report exactly)
@@ -339,6 +348,55 @@ function ageTableBlock(rows) {
 }
 
 // ---------------------------------------------------------------
+// City / region breakdown table
+// ---------------------------------------------------------------
+function geoTableBlock(rows, geoLabel) {
+  var title = "Messages par " + (geoLabel || "ville");
+  var top = rows.slice(0, 25);
+  var maxMsg = Math.max.apply(null, top.map(function (r) { return r.messages; }).concat([0])) || 1;
+  var totalMsg = rows.reduce(function (s, r) { return s + r.messages; }, 0);
+  var body = top.length ? top.map(function (r) {
+    var pctShare = totalMsg ? (r.messages / totalMsg) * 100 : 0;
+    var barWidth = maxMsg ? Math.round((r.messages / maxMsg) * 100) : 0;
+    return "<tr>" +
+      "<td class='name'>" + esc(r.place) + "</td>" +
+      "<td class='num'>" + num(r.messages) + "</td>" +
+      "<td class='num'>" + num(pctShare) + " %</td>" +
+      "<td><div class='age-bar-track'><div class='age-bar-fill' style='width:" + barWidth + "%'></div></div></td>" +
+      "<td class='num'>" + money(r.spend) + "</td>" +
+      "<td class='num'>" + (r.costPerMsg != null ? money(r.costPerMsg) : "—") + "</td>" +
+      "<td class='num'>" + num(r.impressions) + "</td>" +
+      "</tr>";
+  }).join("") : "<tr><td colspan='7' style='text-align:center;color:var(--text-muted);padding:18px;'>Rien à afficher sur cette période.</td></tr>";
+  var head = "<thead><tr><th>" + esc(geoLabel === "région" ? "Région" : "Ville") + "</th><th class='num'>Messages</th><th class='num'>% du total</th><th>Répartition</th><th class='num'>Dépense</th><th class='num'>Coût / message</th><th class='num'>Impressions</th></tr></thead>";
+  return "<div class='section'><div class='section-head'><h3>" + esc(title) + "</h3></div><div class='card table-scroll'><table>" + head + "<tbody>" + body + "</tbody></table></div></div>";
+}
+
+// ---------------------------------------------------------------
+// Creative visual grid (thumbnail, no ad name, messages + cost/message)
+// ---------------------------------------------------------------
+function creativeCardHTML(r, thumbUrl) {
+  var thumb = thumbUrl
+    ? "<img class='creative-thumb' src='" + esc(thumbUrl) + "' alt='Créative publicitaire' loading='lazy' onerror=\"this.onerror=null;this.parentElement.innerHTML='<div class=&quot;creative-placeholder&quot;>Aperçu indisponible</div>';\">"
+    : "<div class='creative-placeholder'>Aperçu indisponible</div>";
+  return "<div class='creative-card'>" + thumb +
+    "<div class='creative-stats'>" +
+    "<div class='creative-stat'><span class='label'>Messages</span><span class='value'>" + num(r.conversions) + "</span></div>" +
+    "<div class='creative-stat'><span class='label'>Coût / message</span><span class='value'>" + (r.cpa != null ? money(r.cpa) : "—") + "</span></div>" +
+    "<div class='creative-stat'><span class='label'>Dépense</span><span class='value'>" + money(r.spend) + "</span></div>" +
+    "</div></div>";
+}
+function creativeGridHTML(rows) {
+  var top = rows.filter(function (r) { return r.conversions > 0; }).slice(0, 24);
+  if (!top.length) top = rows.slice(0, 12);
+  var cards = top.length ? top.map(function (r) {
+    var thumbUrl = AD_THUMBS[r.id] || "";
+    return creativeCardHTML(r, thumbUrl);
+  }).join("") : "<p class='empty-note'>Rien à afficher sur cette période.</p>";
+  return "<div class='section'><div class='section-head'><h3>Messages par créative</h3></div><div class='card'><div class='creative-grid'>" + cards + "</div></div></div>";
+}
+
+// ---------------------------------------------------------------
 // Date range helpers
 // ---------------------------------------------------------------
 function pad2(n) { return n < 10 ? "0" + n : "" + n; }
@@ -398,7 +456,7 @@ function aggregateGroup(rows, since, until, idField, nameField, primaryType, sor
   var groups = {};
   filtered.forEach(function (r) {
     var id = r[idField];
-    if (!groups[id]) groups[id] = { name: r[nameField] || "(sans nom)", spend: 0, impressions: 0, reach: 0, clicks: 0, actionsMap: {} };
+    if (!groups[id]) groups[id] = { id: id, name: r[nameField] || "(sans nom)", spend: 0, impressions: 0, reach: 0, clicks: 0, actionsMap: {} };
     var g = groups[id];
     g.spend += r.spend || 0; g.impressions += r.impressions || 0; g.reach += r.reach || 0; g.clicks += r.clicks || 0;
     (r.actions || []).forEach(function (a) { g.actionsMap[a.action_type] = (g.actionsMap[a.action_type] || 0) + (parseFloat(a.value) || 0); });
@@ -407,7 +465,7 @@ function aggregateGroup(rows, since, until, idField, nameField, primaryType, sor
     var g = groups[id];
     var conversions = primaryType ? (g.actionsMap[primaryType] || 0) : 0;
     return {
-      name: g.name, spend: g.spend, impressions: g.impressions, reach: g.reach,
+      id: g.id, name: g.name, spend: g.spend, impressions: g.impressions, reach: g.reach,
       ctr: g.impressions ? (g.clicks / g.impressions) * 100 : 0,
       cpm: g.impressions ? (g.spend / g.impressions) * 1000 : 0,
       conversions: conversions,
@@ -445,6 +503,29 @@ function aggregateAge(since, until, primaryType) {
   return out;
 }
 
+function aggregateGeo(since, until, primaryType) {
+  var rows = (DATA.daily_city || []).filter(function (r) { return inRange(r.date, since, until); });
+  var groups = {};
+  rows.forEach(function (r) {
+    var place = r.place || "unknown";
+    if (!groups[place]) groups[place] = { place: place, spend: 0, impressions: 0, clicks: 0, actionsMap: {} };
+    var g = groups[place];
+    g.spend += r.spend || 0; g.impressions += r.impressions || 0; g.clicks += r.clicks || 0;
+    (r.actions || []).forEach(function (a) { g.actionsMap[a.action_type] = (g.actionsMap[a.action_type] || 0) + (parseFloat(a.value) || 0); });
+  });
+  var out = Object.keys(groups).map(function (place) {
+    var g = groups[place];
+    var messages = primaryType ? (g.actionsMap[primaryType] || 0) : 0;
+    return {
+      place: place, spend: g.spend, impressions: g.impressions, clicks: g.clicks,
+      messages: messages,
+      costPerMsg: messages ? g.spend / messages : null
+    };
+  }).filter(function (r) { return r.place && r.place !== "unknown"; });
+  out.sort(function (a, b) { return b.messages - a.messages; });
+  return out;
+}
+
 function dailySeries(since, until, primaryType) {
   var rows = DATA.daily_account.filter(function (r) { return inRange(r.date, since, until); }).slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; });
   var dates = rows.map(function (r) { return r.date; });
@@ -475,8 +556,12 @@ function render() {
   var ageRows = aggregateAge(since, until, primaryType);
   var ageBlockHTML = ageTableBlock(ageRows);
 
+  var geoLabel = DATA.meta.geo_breakdown_type === "region" ? "région" : "ville";
+  var geoRows = aggregateGeo(since, until, primaryType);
+  var geoBlockHTML = geoTableBlock(geoRows, geoLabel);
+
   var adCmp = aggregateGroup(DATA.daily_ad || [], since, until, "ad_id", "ad_name", primaryType, "conversions");
-  var adMessagesBlockHTML = cmpTableBlock("Quelle publicité génère le plus de messages", adCmp);
+  var creativeBlockHTML = creativeGridHTML(adCmp);
 
   var campaignCmp = aggregateGroup(DATA.daily_campaign, since, until, "campaign_id", "campaign_name", primaryType, "spend");
   var adsetCmp = aggregateGroup(DATA.daily_adset, since, until, "adset_id", "adset_name", primaryType, "spend");
@@ -488,7 +573,8 @@ function render() {
     '<div><div class="chart-title">Messages quotidiens</div><div class="chart-box">' + convChart + '</div></div>' +
     '</div></div></div>' +
     ageBlockHTML +
-    adMessagesBlockHTML +
+    geoBlockHTML +
+    creativeBlockHTML +
     '<div class="section"><div class="section-head"><h3>Détail des conversions</h3></div><div class="card table-scroll">' + convTableHTML + '</div></div>' +
     cmpTableBlock("Performance par campagne", campaignCmp) +
     cmpTableBlock("Performance par ensemble de publicités", adsetCmp) +
@@ -583,6 +669,9 @@ fetch(WEBAPP_URL)
     DATA = json;
     CURRENCY = json.meta.currency || "USD";
     document.getElementById("acctName").textContent = json.meta.display_name || CLIENT_DISPLAY_NAME;
+    (json.ad_creatives || []).forEach(function (c) {
+      if (c.ad_id && c.thumbnail_url) AD_THUMBS[c.ad_id] = c.thumbnail_url;
+    });
 
     renderRangeBar();
     setActivePreset("last30d");
