@@ -25,6 +25,11 @@ const ACCOUNT_RAW = process.env.AD_ACCOUNT_ID;
 const API_VERSION = process.env.API_VERSION || "v26.0";
 const DATE_PRESET = process.env.DATE_PRESET || "last_30d";
 const AGENCY_NAME = process.env.AGENCY_NAME || "Kaylest Agency";
+// Optional: force an exact date range instead of DATE_PRESET (useful to
+// test against a period with known activity, e.g. an older campaign).
+const RANGE_SINCE = process.env.RANGE_SINCE || "";
+const RANGE_UNTIL = process.env.RANGE_UNTIL || "";
+const USE_CUSTOM_RANGE = !!(RANGE_SINCE && RANGE_UNTIL);
 
 if (!TOKEN || !ACCOUNT_RAW) {
   console.error("Missing META_ACCESS_TOKEN or AD_ACCOUNT_ID environment variable.");
@@ -347,16 +352,16 @@ const STYLE = `<style>
   td.name{ max-width:220px; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
   .empty-note{ font-size:12.5px; color:var(--text-muted); padding:20px 4px; text-align:center; }
   .footnote{ font-size:11.5px; color:var(--text-muted); text-align:center; margin-top:30px; line-height:1.6; }
-</style>`;
-
-// ---------------------------------------------------------------
+</style>`;// ---------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------
 async function main() {
   const FIELDS_ACCOUNT = "spend,impressions,reach,clicks,ctr,cpm,cpc,actions,action_values,cost_per_action_type,purchase_roas";
   const FIELDS_CAMPAIGN = "campaign_name," + FIELDS_ACCOUNT;
   const FIELDS_ADSET = "adset_name," + FIELDS_ACCOUNT;
-  const rangeParams = { date_preset: DATE_PRESET };
+  const rangeParams = USE_CUSTOM_RANGE
+    ? { time_range: JSON.stringify({ since: RANGE_SINCE, until: RANGE_UNTIL }) }
+    : { date_preset: DATE_PRESET };
 
   const meta = await graphGet(ACCOUNT_ID, { fields: "name,currency,timezone_name" });
   currency = meta.currency || "USD";
@@ -391,7 +396,7 @@ async function main() {
   const campaignCmp = buildCmpRows(campaignRows, "campaign_name", primaryType);
   const adsetCmp = buildCmpRows(adsetRows, "adset_name", primaryType);
 
-  const rangeLabel = RANGE_LABELS[DATE_PRESET] || DATE_PRESET;
+  const rangeLabel = USE_CUSTOM_RANGE ? (RANGE_SINCE + " au " + RANGE_UNTIL) : (RANGE_LABELS[DATE_PRESET] || DATE_PRESET);
   const generatedAt = new Date().toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short", timeZone: "UTC" }) + " UTC";
 
   const html = "<!DOCTYPE html>\n<html lang=\"fr\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n<title>" + esc(acctName) + " — Rapport Meta Ads</title>\n" + STYLE + "\n</head>\n<body>\n<div class=\"wrap\">\n" +
