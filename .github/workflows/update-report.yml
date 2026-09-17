@@ -28,6 +28,8 @@ jobs:
           API_VERSION: ${{ vars.API_VERSION }}
           DATE_PRESET: ${{ vars.DATE_PRESET }}
           AGENCY_NAME: ${{ vars.AGENCY_NAME }}
+          RANGE_SINCE: ${{ vars.RANGE_SINCE }}
+          RANGE_UNTIL: ${{ vars.RANGE_UNTIL }}
         run: node generate-report.mjs
 
       - name: Commit and push if changed
