@@ -77,14 +77,6 @@
   .error-box{ color:var(--critical); }
   .age-bar-track{ width:100%; min-width:80px; height:8px; background:var(--gridline); border-radius:999px; overflow:hidden; }
   .age-bar-fill{ height:100%; background:var(--series-conv); border-radius:999px; }
-  .creative-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px; }
-  .creative-card{ border:1px solid var(--gridline); border-radius:10px; overflow:hidden; background:var(--card-bg, #fff); display:flex; flex-direction:column; }
-  .creative-thumb{ width:100%; aspect-ratio:1/1; object-fit:cover; display:block; background:var(--gridline); }
-  .creative-placeholder{ width:100%; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; background:var(--gridline); color:var(--text-muted); font-size:11.5px; text-align:center; padding:8px; }
-  .creative-stats{ padding:8px 10px 10px; display:flex; flex-direction:column; gap:3px; }
-  .creative-stat{ display:flex; justify-content:space-between; align-items:baseline; font-size:11.5px; }
-  .creative-stat .label{ color:var(--text-muted); }
-  .creative-stat .value{ font-weight:700; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
@@ -110,7 +102,6 @@ var CLIENT_DISPLAY_NAME = "Belkatours Agency";
 var DATA = null;      // raw payload from the Web App
 var CURRENCY = "USD";
 var currentRange = null; // {since, until, label}
-var AD_THUMBS = {};   // ad_id -> thumbnail_url, built once DATA loads
 
 // ---------------------------------------------------------------
 // Formatting helpers (mirrors the original static report exactly)
@@ -373,48 +364,6 @@ function geoTableBlock(rows, geoLabel) {
 }
 
 // ---------------------------------------------------------------
-// Creative visual grid (thumbnail, no ad name, messages + cost/message)
-// ---------------------------------------------------------------
-function creativeCardHTML(r, thumbUrl) {
-  var thumb = thumbUrl
-    ? "<img class='creative-thumb' src='" + esc(thumbUrl) + "' alt='Créative publicitaire' loading='lazy' onerror=\"this.onerror=null;this.parentElement.innerHTML='<div class=&quot;creative-placeholder&quot;>Aperçu indisponible</div>';\">"
-    : "<div class='creative-placeholder'>Aperçu indisponible</div>";
-  return "<div class='creative-card'>" + thumb +
-    "<div class='creative-stats'>" +
-    "<div class='creative-stat'><span class='label'>Messages</span><span class='value'>" + num(r.conversions) + "</span></div>" +
-    "<div class='creative-stat'><span class='label'>Coût / message</span><span class='value'>" + (r.cpa != null ? money(r.cpa) : "—") + "</span></div>" +
-    "<div class='creative-stat'><span class='label'>Dépense</span><span class='value'>" + money(r.spend) + "</span></div>" +
-    "</div></div>";
-}
-function creativeGridHTML(rows) {
-  // Several ads can reuse the exact same visual (image/video). Dedupe by
-  // thumbnail URL so each distinct creative appears once, with its stats
-  // summed across every ad that uses it. Ads with no thumbnail are kept
-  // as separate cards (nothing to dedupe them against).
-  var groups = {};
-  var order = [];
-  rows.forEach(function (r) {
-    var thumbUrl = AD_THUMBS[r.id] || "";
-    var key = thumbUrl ? ("img:" + thumbUrl) : ("noimg:" + r.id);
-    if (!groups[key]) { groups[key] = { thumbUrl: thumbUrl, conversions: 0, spend: 0 }; order.push(key); }
-    groups[key].conversions += r.conversions || 0;
-    groups[key].spend += r.spend || 0;
-  });
-  var merged = order.map(function (key) {
-    var g = groups[key];
-    return { thumbUrl: g.thumbUrl, conversions: g.conversions, spend: g.spend, cpa: g.conversions ? g.spend / g.conversions : null };
-  });
-  merged.sort(function (a, b) { return b.conversions - a.conversions; });
-
-  var top = merged.filter(function (r) { return r.conversions > 0; }).slice(0, 24);
-  if (!top.length) top = merged.slice(0, 12);
-  var cards = top.length ? top.map(function (r) {
-    return creativeCardHTML(r, r.thumbUrl);
-  }).join("") : "<p class='empty-note'>Rien à afficher sur cette période.</p>";
-  return "<div class='section'><div class='section-head'><h3>Messages par créative</h3></div><div class='card'><div class='creative-grid'>" + cards + "</div></div></div>";
-}
-
-// ---------------------------------------------------------------
 // Date range helpers
 // ---------------------------------------------------------------
 function pad2(n) { return n < 10 ? "0" + n : "" + n; }
@@ -578,9 +527,6 @@ function render() {
   var geoRows = aggregateGeo(since, until, primaryType);
   var geoBlockHTML = geoTableBlock(geoRows, geoLabel);
 
-  var adCmp = aggregateGroup(DATA.daily_ad || [], since, until, "ad_id", "ad_name", primaryType, "conversions");
-  var creativeBlockHTML = creativeGridHTML(adCmp);
-
   var campaignCmp = aggregateGroup(DATA.daily_campaign, since, until, "campaign_id", "campaign_name", primaryType, "spend");
 
   var html =
@@ -591,7 +537,6 @@ function render() {
     '</div></div></div>' +
     ageBlockHTML +
     geoBlockHTML +
-    creativeBlockHTML +
     '<div class="section"><div class="section-head"><h3>Détail des conversions</h3></div><div class="card table-scroll">' + convTableHTML + '</div></div>' +
     cmpTableBlock("Performance par campagne", campaignCmp) +
     '<p class="footnote">Rapport de performance préparé par ' + esc(DATA.meta.agency_name || "Kaylest Agency") + '. Événement de conversion principal suivi : ' + esc(primaryLabel) + '. Données mises à jour automatiquement plusieurs fois par jour ; dernière synchronisation : ' + esc(formatSyncTime(DATA.meta.last_updated)) + '.</p>';
@@ -685,10 +630,6 @@ fetch(WEBAPP_URL)
     DATA = json;
     CURRENCY = json.meta.currency || "USD";
     document.getElementById("acctName").textContent = json.meta.display_name || CLIENT_DISPLAY_NAME;
-    (json.ad_creatives || []).forEach(function (c) {
-      if (c.ad_id && c.thumbnail_url) AD_THUMBS[c.ad_id] = c.thumbnail_url;
-    });
-
     renderRangeBar();
     setActivePreset("last30d");
     currentRange = computePreset("last30d");
